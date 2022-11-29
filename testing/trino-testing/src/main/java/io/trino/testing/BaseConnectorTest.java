@@ -2135,6 +2135,20 @@ public abstract class BaseConnectorTest
     }
 
     @Test
+    public void testDropAndAddColumnWithSameName()
+    {
+        skipTestUnless(hasBehavior(SUPPORTS_DROP_COLUMN) && hasBehavior(SUPPORTS_ADD_COLUMN));
+
+        try (TestTable table = new TestTable(getQueryRunner()::execute, "test_drop_and_add_column", "AS SELECT 123 x, 456 y")) {
+            assertUpdate("ALTER TABLE " + table.getName() + " DROP COLUMN y");
+            assertQuery("SELECT * FROM " + table.getName(), "VALUES 123");
+
+            assertUpdate("ALTER TABLE " + table.getName() + " ADD COLUMN y int");
+            assertQuery("SELECT * FROM " + table.getName(), "VALUES (123, NULL)");
+        }
+    }
+
+    @Test
     public void testRenameColumn()
     {
         if (!hasBehavior(SUPPORTS_RENAME_COLUMN)) {
