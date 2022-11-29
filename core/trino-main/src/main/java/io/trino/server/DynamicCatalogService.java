@@ -1,3 +1,16 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.trino.server;
 
 import io.airlift.discovery.client.Announcer;
@@ -7,6 +20,7 @@ import io.trino.metadata.Catalog;
 import io.trino.metadata.CatalogManager;
 
 import javax.inject.Inject;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -15,18 +29,20 @@ import java.util.Set;
 import static io.airlift.discovery.client.ServiceAnnouncement.serviceAnnouncement;
 import static java.util.stream.Collectors.joining;
 
-public class DynamicCatalogService {
-
+public class DynamicCatalogService
+{
     private final Announcer announcer;
     private final CatalogManager catalogManager;
 
     @Inject
-    public DynamicCatalogService(Announcer announcer, CatalogManager catalogManager) {
+    public DynamicCatalogService(Announcer announcer, CatalogManager catalogManager)
+    {
         this.announcer = announcer;
         this.catalogManager = catalogManager;
     }
 
-    public void refreshCatalogHandleIds(){
+    public void refreshCatalogHandleIds()
+    {
         ServiceAnnouncement announcement = getTrinoAnnouncement(announcer.getServiceAnnouncements());
 
         // automatically build catalogHandleIds if not configured
