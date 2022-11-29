@@ -409,9 +409,13 @@ public class ServerMainModule
         discoveryBinder(binder).bindHttpAnnouncement("trino")
                 .addProperty("node_version", nodeVersion)
                 .addProperty("coordinator", String.valueOf(serverConfig.isCoordinator()));
+        binder.bind(DynamicCatalogService.class).in(Scopes.SINGLETON);
 
         // server info resource
         jaxrsBinder(binder).bind(ServerInfoResource.class);
+
+        // catalog resource
+        jaxrsBinder(binder).bind(CatalogResource.class);
 
         // node status resource
         jaxrsBinder(binder).bind(StatusResource.class);

@@ -195,6 +195,11 @@ public class StaticCatalogManager
     @Override
     public void createCatalog(String catalogName, String connectorName, Map<String, String> properties)
     {
-        throw new TrinoException(NOT_SUPPORTED, "Create catalog is not supported by the static catalog manager");
+        //TODO StaticCatalogManager가 아니라 다른 클래스로 옮겨야 함
+        checkState(!catalogs.containsKey(catalogName), "Catalog '%s' already exists", catalogName);
+
+        CatalogProperties catalogProperties = new CatalogProperties(createRootCatalogHandle(catalogName), connectorName, properties);
+        CatalogConnector catalog = catalogFactory.createCatalog(catalogProperties);
+        catalogs.put(catalogName, catalog);
     }
 }
