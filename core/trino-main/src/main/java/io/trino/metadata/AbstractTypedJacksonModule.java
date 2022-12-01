@@ -67,17 +67,16 @@ public abstract class AbstractTypedJacksonModule<T>
     private static class InternalTypeDeserializer<T>
             extends StdDeserializer<T>
     {
-        private final TypeDeserializer typeDeserializer;
+        private JavaType bt;
+        private TypeIdResolver typeIdResolver;
 
+        private Class<T> baseClass;
         public InternalTypeDeserializer(Class<T> baseClass, TypeIdResolver typeIdResolver)
         {
             super(baseClass);
-            this.typeDeserializer = new AsPropertyTypeDeserializer(
-                    TypeFactory.defaultInstance().constructType(baseClass),
-                    typeIdResolver,
-                    TYPE_PROPERTY,
-                    false,
-                    null);
+            this.bt = TypeFactory.defaultInstance().constructType(baseClass);
+            this.typeIdResolver = typeIdResolver;
+            this.baseClass = baseClass;
         }
 
         @SuppressWarnings("unchecked")
@@ -85,6 +84,13 @@ public abstract class AbstractTypedJacksonModule<T>
         public T deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
                 throws IOException
         {
+            //TODO 매번 객체를 생성하지 않고 처리할 수 있는 방식이 있는지 확인 필요
+            TypeDeserializer typeDeserializer = new AsPropertyTypeDeserializer(
+                    TypeFactory.defaultInstance().constructType(baseClass),
+                    typeIdResolver,
+                    TYPE_PROPERTY,
+                    false,
+                    null);
             return (T) typeDeserializer.deserializeTypedFromAny(jsonParser, deserializationContext);
         }
     }

@@ -201,4 +201,14 @@ public class StaticCatalogManager
         CatalogConnector catalog = catalogFactory.createCatalog(catalogProperties);
         catalogs.put(catalogName, catalog);
     }
+
+    @Override
+    public void refreshCatalog(String catalogName)
+    {
+        //todo 로직 전체 수정 필요
+        CatalogConnector prevConnector = catalogs.get(catalogName);
+        Map<String, String> prevProps = prevConnector.getCatalogProperties().get().getProperties();
+        CatalogProperties catalogProperties = new CatalogProperties(createRootCatalogHandle(catalogName), prevConnector.getConnectorName(), prevProps);
+        catalogs.put(catalogName, catalogFactory.createCatalog(catalogProperties));
+    }
 }

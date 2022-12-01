@@ -34,6 +34,8 @@ import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import io.trino.spi.type.TypeManager;
 import io.trino.transaction.TransactionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
@@ -56,6 +58,7 @@ import static java.util.Objects.requireNonNull;
 public class DefaultCatalogFactory
         implements CatalogFactory
 {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogFactory.class);
     private final Metadata metadata;
     private final AccessControl accessControl;
     private final HandleResolver handleResolver;
@@ -102,10 +105,12 @@ public class DefaultCatalogFactory
     @Override
     public synchronized void addConnectorFactory(ConnectorFactory connectorFactory, Function<CatalogHandle, ClassLoader> duplicatePluginClassLoaderFactory)
     {
-        InternalConnectorFactory existingConnectorFactory = connectorFactories.putIfAbsent(
+        InternalConnectorFactory existingConnectorFactory = connectorFactories.put(
                 connectorFactory.getName(),
                 new InternalConnectorFactory(connectorFactory, duplicatePluginClassLoaderFactory));
-        checkArgument(existingConnectorFactory == null, "Connector '%s' is already registered", connectorFactory.getName());
+        if(existingConnectorFactory != null) {
+            LOG.info(String.format("ConnectorFactory replaced: %s", connectorFactory.getName()));
+        }
     }
 
     @Override
@@ -198,6 +203,7 @@ public class DefaultCatalogFactory
                 duplicatePluginClassLoaderFactory);
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(connectorFactory.getClass().getClassLoader())) {
+            LOG.info("Root class loader: " + Thread.currentThread().getContextClassLoader());
             return connectorFactory.create(catalogName, properties, context);
         }
     }

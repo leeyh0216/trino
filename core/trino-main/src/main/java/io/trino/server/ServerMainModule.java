@@ -420,6 +420,8 @@ public class ServerMainModule
         // node status resource
         jaxrsBinder(binder).bind(StatusResource.class);
 
+        jaxrsBinder(binder).bind(PluginResource.class);
+
         // plugin manager
         binder.bind(PluginManager.class).in(Scopes.SINGLETON);
         newOptionalBinder(binder, PluginsProvider.class).setDefault()

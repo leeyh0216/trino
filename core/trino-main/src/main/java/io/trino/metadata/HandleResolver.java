@@ -37,8 +37,8 @@ public final class HandleResolver
 
     public void registerClassLoader(PluginClassLoader classLoader)
     {
-        ClassLoader existingClassLoader = classLoaders.putIfAbsent(classLoader.getId(), classLoader);
-        checkState(existingClassLoader == null, "Class loader already registered: %s", classLoader.getId());
+        //TODO 중복된 이름 존재 시 문제될 수 있기 때문에, 별도 메서드로 빼야함
+        ClassLoader existingClassLoader = classLoaders.put(classLoader.getId(), classLoader);
     }
 
     public void unregisterClassLoader(PluginClassLoader classLoader)
