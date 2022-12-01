@@ -194,7 +194,6 @@ public class StaticCatalogManager
     @Override
     public void createCatalog(String catalogName, String connectorName, Map<String, String> properties)
     {
-        //TODO StaticCatalogManager가 아니라 다른 클래스로 옮겨야 함
         checkState(!catalogs.containsKey(catalogName), "Catalog '%s' already exists", catalogName);
 
         CatalogProperties catalogProperties = new CatalogProperties(createRootCatalogHandle(catalogName), connectorName, properties);
@@ -205,10 +204,17 @@ public class StaticCatalogManager
     @Override
     public void refreshCatalog(String catalogName)
     {
-        //todo 로직 전체 수정 필요
         CatalogConnector prevConnector = catalogs.get(catalogName);
-        Map<String, String> prevProps = prevConnector.getCatalogProperties().get().getProperties();
+        Map<String, String> prevProps = new HashMap<>();
+        if (prevConnector.getCatalogProperties().isPresent()) {
+            prevProps.putAll(prevConnector.getCatalogProperties().get().getProperties());
+        }
         CatalogProperties catalogProperties = new CatalogProperties(createRootCatalogHandle(catalogName), prevConnector.getConnectorName(), prevProps);
-        catalogs.put(catalogName, catalogFactory.createCatalog(catalogProperties));
+
+        CatalogConnector existingCatalogConnector = catalogs.put(catalogName, catalogFactory.createCatalog(catalogProperties));
+        if (existingCatalogConnector != null) {
+            log.info("Shutdown previous catalog: {}", existingCatalogConnector.getCatalogHandle().getCatalogName());
+//            existingCatalogConnector.shutdown();
+        }
     }
 }

@@ -108,7 +108,7 @@ public class DefaultCatalogFactory
         InternalConnectorFactory existingConnectorFactory = connectorFactories.put(
                 connectorFactory.getName(),
                 new InternalConnectorFactory(connectorFactory, duplicatePluginClassLoaderFactory));
-        if(existingConnectorFactory != null) {
+        if (existingConnectorFactory != null) {
             LOG.info(String.format("ConnectorFactory replaced: %s", connectorFactory.getName()));
         }
     }
@@ -203,7 +203,6 @@ public class DefaultCatalogFactory
                 duplicatePluginClassLoaderFactory);
 
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(connectorFactory.getClass().getClassLoader())) {
-            LOG.info("Root class loader: " + Thread.currentThread().getContextClassLoader());
             return connectorFactory.create(catalogName, properties, context);
         }
     }

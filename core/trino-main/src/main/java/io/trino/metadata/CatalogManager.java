@@ -64,5 +64,8 @@ public interface CatalogManager
 
     void createCatalog(String catalogName, String connectorName, Map<String, String> properties);
 
-    void refreshCatalog(String catalogName);
+    default void refreshCatalog(String catalogName)
+    {
+        throw new UnsupportedOperationException();
+    }
 }

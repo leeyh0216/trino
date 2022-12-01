@@ -71,6 +71,7 @@ public abstract class AbstractTypedJacksonModule<T>
         private TypeIdResolver typeIdResolver;
 
         private Class<T> baseClass;
+
         public InternalTypeDeserializer(Class<T> baseClass, TypeIdResolver typeIdResolver)
         {
             super(baseClass);
