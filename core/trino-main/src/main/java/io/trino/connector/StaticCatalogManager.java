@@ -211,10 +211,9 @@ public class StaticCatalogManager
         }
         CatalogProperties catalogProperties = new CatalogProperties(createRootCatalogHandle(catalogName), prevConnector.getConnectorName(), prevProps);
 
-        CatalogConnector existingCatalogConnector = catalogs.put(catalogName, catalogFactory.createCatalog(catalogProperties));
-        if (existingCatalogConnector != null) {
-            log.info("Shutdown previous catalog: {}", existingCatalogConnector.getCatalogHandle().getCatalogName());
-//            existingCatalogConnector.shutdown();
-        }
+        prevConnector.shutdown();
+        catalogs.remove(catalogName);
+
+        catalogs.put(catalogName, catalogFactory.createCatalog(catalogProperties));
     }
 }

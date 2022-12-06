@@ -19,6 +19,7 @@ import io.trino.execution.AddColumnTask;
 import io.trino.execution.CallTask;
 import io.trino.execution.CommentTask;
 import io.trino.execution.CommitTask;
+import io.trino.execution.CreateCatalogTask;
 import io.trino.execution.CreateMaterializedViewTask;
 import io.trino.execution.CreateRoleTask;
 import io.trino.execution.CreateSchemaTask;
@@ -35,7 +36,9 @@ import io.trino.execution.DropTableTask;
 import io.trino.execution.DropViewTask;
 import io.trino.execution.GrantRolesTask;
 import io.trino.execution.GrantTask;
+import io.trino.execution.LoadPluginTask;
 import io.trino.execution.PrepareTask;
+import io.trino.execution.RefreshCatalogTask;
 import io.trino.execution.RenameColumnTask;
 import io.trino.execution.RenameMaterializedViewTask;
 import io.trino.execution.RenameSchemaTask;
@@ -62,6 +65,7 @@ import io.trino.sql.tree.Analyze;
 import io.trino.sql.tree.Call;
 import io.trino.sql.tree.Comment;
 import io.trino.sql.tree.Commit;
+import io.trino.sql.tree.CreateCatalog;
 import io.trino.sql.tree.CreateMaterializedView;
 import io.trino.sql.tree.CreateRole;
 import io.trino.sql.tree.CreateSchema;
@@ -84,9 +88,11 @@ import io.trino.sql.tree.ExplainAnalyze;
 import io.trino.sql.tree.Grant;
 import io.trino.sql.tree.GrantRoles;
 import io.trino.sql.tree.Insert;
+import io.trino.sql.tree.LoadPlugin;
 import io.trino.sql.tree.Merge;
 import io.trino.sql.tree.Prepare;
 import io.trino.sql.tree.Query;
+import io.trino.sql.tree.RefreshCatalog;
 import io.trino.sql.tree.RefreshMaterializedView;
 import io.trino.sql.tree.RenameColumn;
 import io.trino.sql.tree.RenameMaterializedView;
@@ -192,6 +198,9 @@ public final class StatementUtils
             .add(dataDefinitionStatement(CreateView.class, CreateViewTask.class))
             .add(dataDefinitionStatement(Deallocate.class, DeallocateTask.class))
             .add(dataDefinitionStatement(Deny.class, DenyTask.class))
+            .add(dataDefinitionStatement(LoadPlugin.class, LoadPluginTask.class))
+            .add(dataDefinitionStatement(RefreshCatalog.class, RefreshCatalogTask.class))
+            .add(dataDefinitionStatement(CreateCatalog.class, CreateCatalogTask.class))
             .add(dataDefinitionStatement(DropColumn.class, DropColumnTask.class))
             .add(dataDefinitionStatement(DropMaterializedView.class, DropMaterializedViewTask.class))
             .add(dataDefinitionStatement(DropRole.class, DropRoleTask.class))

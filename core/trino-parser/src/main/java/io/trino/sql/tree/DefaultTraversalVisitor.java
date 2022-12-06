@@ -734,6 +734,14 @@ public abstract class DefaultTraversalVisitor<C>
     }
 
     @Override
+    protected Void visitCatalogProperty(CatalogProperty node, C context)
+    {
+        process(node.getValue(), context);
+
+        return null;
+    }
+
+    @Override
     protected Void visitAnalyze(Analyze node, C context)
     {
         for (Property property : node.getProperties()) {

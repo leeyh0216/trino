@@ -627,6 +627,25 @@ public abstract class AstVisitor<R, C>
         return visitStatement(node, context);
     }
 
+    protected R visitRefreshCatalog(RefreshCatalog node, C context)
+    {
+        return visitStatement(node, context);
+    }
+    protected R visitLoadPlugin(LoadPlugin node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitCreateCatalog(CreateCatalog node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitCatalogProperty(CatalogProperty node, C context)
+    {
+        return visitNode(node, context);
+    }
+
     protected R visitRenameView(RenameView node, C context)
     {
         return visitStatement(node, context);

@@ -42,6 +42,12 @@ statement
     : query                                                            #statementDefault
     | USE schema=identifier                                            #use
     | USE catalog=identifier '.' schema=identifier                     #use
+    | LOAD PLUGIN qualifiedName
+        (LOCATION dir=string)                                          #loadPlugin
+    | CREATE CATALOG (IF NOT EXISTS)? qualifiedName
+        (PLUGIN plugin=string)?
+        (WITH catalogProperties)?                                      #createCatalog
+    | REFRESH CATALOG qualifiedName                                    #refreshCatalog
     | CREATE SCHEMA (IF NOT EXISTS)? qualifiedName
         (AUTHORIZATION principal)?
         (WITH properties)?                                             #createSchema
@@ -208,6 +214,18 @@ property
 propertyValue
     : DEFAULT       #defaultPropertyValue
     | expression    #nonDefaultPropertyValue
+    ;
+
+catalogProperties
+    : '(' catalogPropertyAssignments ')'
+    ;
+
+catalogPropertyAssignments
+    : catalogProperty (',' catalogProperty)*
+    ;
+
+catalogProperty
+    : string EQ expression
     ;
 
 queryNoWith
@@ -830,7 +848,7 @@ nonReserved
     // IMPORTANT: this rule must only contain tokens. Nested rules are not supported. See SqlParser.exitNonReserved
     : ABSENT | ADD | ADMIN | AFTER | ALL | ANALYZE | ANY | ARRAY | ASC | AT | AUTHORIZATION
     | BERNOULLI | BOTH
-    | CALL | CASCADE | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CONDITIONAL | COPARTITION | COUNT | CURRENT
+    | CALL | CASCADE | CATALOG | CATALOGS | COLUMN | COLUMNS | COMMENT | COMMIT | COMMITTED | CONDITIONAL | COPARTITION | COUNT | CURRENT
     | DATA | DATE | DAY | DEFAULT | DEFINE | DEFINER | DENY | DESC | DESCRIPTOR | DISTRIBUTED | DOUBLE
     | EMPTY | ENCODING | ERROR | EXCLUDING | EXPLAIN
     | FETCH | FILTER | FINAL | FIRST | FOLLOWING | FORMAT | FUNCTIONS
@@ -839,7 +857,7 @@ nonReserved
     | IF | IGNORE | INCLUDING | INITIAL | INPUT | INTERVAL | INVOKER | IO | ISOLATION
     | JSON
     | KEEP | KEY | KEYS
-    | LAST | LATERAL | LEADING | LEVEL | LIMIT | LOCAL | LOGICAL
+    | LAST | LATERAL | LEADING | LEVEL | LIMIT | LOCAL | LOGICAL | LOAD | LOCATION | PLUGIN
     | MAP | MATCH | MATCHED | MATCHES | MATCH_RECOGNIZE | MATERIALIZED | MEASURES | MERGE | MINUTE | MONTH
     | NEXT | NFC | NFD | NFKC | NFKD | NO | NONE | NULLIF | NULLS
     | OBJECT | OF | OFFSET | OMIT | ONE | ONLY | OPTION | ORDINALITY | OUTPUT | OVER | OVERFLOW
@@ -856,6 +874,9 @@ nonReserved
     | ZONE
     ;
 
+LOAD: 'LOAD';
+LOCATION: 'LOCATION';
+PLUGIN: 'PLUGIN';
 ABSENT: 'ABSENT';
 ADD: 'ADD';
 ADMIN: 'ADMIN';
@@ -878,6 +899,7 @@ CALL: 'CALL';
 CASCADE: 'CASCADE';
 CASE: 'CASE';
 CAST: 'CAST';
+CATALOG: 'CATALOG';
 CATALOGS: 'CATALOGS';
 COLUMN: 'COLUMN';
 COLUMNS: 'COLUMNS';

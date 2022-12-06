@@ -293,6 +293,12 @@ public class TestSqlParser
 {
     private static final SqlParser SQL_PARSER = new SqlParser();
 
+//    @Test
+//    void testCreateCatalog()
+//    {
+//        assertStatement("CREATE CATALOG test", new CreateCatalog(QualifiedName.of("test"), false, ImmutableList.of()));
+//    }
+
     @Test
     public void testPosition()
     {

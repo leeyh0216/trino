@@ -34,12 +34,14 @@ import io.trino.sql.tree.BooleanLiteral;
 import io.trino.sql.tree.Call;
 import io.trino.sql.tree.CallArgument;
 import io.trino.sql.tree.Cast;
+import io.trino.sql.tree.CatalogProperty;
 import io.trino.sql.tree.CharLiteral;
 import io.trino.sql.tree.CoalesceExpression;
 import io.trino.sql.tree.ColumnDefinition;
 import io.trino.sql.tree.Comment;
 import io.trino.sql.tree.Commit;
 import io.trino.sql.tree.ComparisonExpression;
+import io.trino.sql.tree.CreateCatalog;
 import io.trino.sql.tree.CreateMaterializedView;
 import io.trino.sql.tree.CreateRole;
 import io.trino.sql.tree.CreateSchema;
@@ -131,6 +133,7 @@ import io.trino.sql.tree.Lateral;
 import io.trino.sql.tree.LikeClause;
 import io.trino.sql.tree.LikePredicate;
 import io.trino.sql.tree.Limit;
+import io.trino.sql.tree.LoadPlugin;
 import io.trino.sql.tree.LogicalExpression;
 import io.trino.sql.tree.LongLiteral;
 import io.trino.sql.tree.MeasureDefinition;
@@ -172,6 +175,7 @@ import io.trino.sql.tree.QueryBody;
 import io.trino.sql.tree.QueryPeriod;
 import io.trino.sql.tree.QuerySpecification;
 import io.trino.sql.tree.RangeQuantifier;
+import io.trino.sql.tree.RefreshCatalog;
 import io.trino.sql.tree.RefreshMaterializedView;
 import io.trino.sql.tree.Relation;
 import io.trino.sql.tree.RenameColumn;
@@ -626,6 +630,49 @@ class AstBuilder
         }
 
         return new SetProperties(getLocation(context), SetProperties.Type.TABLE, getQualifiedName(context.qualifiedName()), properties);
+    }
+
+    @Override
+    public Node visitRefreshCatalog(SqlBaseParser.RefreshCatalogContext ctx)
+    {
+        return new RefreshCatalog(
+                getLocation(ctx),
+                getQualifiedName(ctx.qualifiedName())
+        );
+    }
+
+    @Override
+    public Node visitLoadPlugin(SqlBaseParser.LoadPluginContext context)
+    {
+        return new LoadPlugin(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                context.dir.getText().replaceAll("'", ""));
+    }
+
+    @Override
+    public Node visitCreateCatalog(SqlBaseParser.CreateCatalogContext context)
+    {
+        List<CatalogProperty> properties = ImmutableList.of();
+        if (context.catalogProperties() != null) {
+            properties = visit(context.catalogProperties().catalogPropertyAssignments().catalogProperty(), CatalogProperty.class);
+        }
+
+        return new CreateCatalog(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                context.plugin.getText().replaceAll("'", ""),
+                context.EXISTS() != null,
+                properties);
+    }
+
+    @Override
+    public Node visitCatalogProperty(SqlBaseParser.CatalogPropertyContext ctx)
+    {
+        return new CatalogProperty(
+                getLocation(ctx),
+                ((StringLiteral) visit(ctx.string())).getValue(),
+                (Expression) visit(ctx.expression()));
     }
 
     @Override

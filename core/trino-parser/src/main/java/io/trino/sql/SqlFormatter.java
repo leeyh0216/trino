@@ -23,9 +23,11 @@ import io.trino.sql.tree.Analyze;
 import io.trino.sql.tree.AstVisitor;
 import io.trino.sql.tree.Call;
 import io.trino.sql.tree.CallArgument;
+import io.trino.sql.tree.CatalogProperty;
 import io.trino.sql.tree.ColumnDefinition;
 import io.trino.sql.tree.Comment;
 import io.trino.sql.tree.Commit;
+import io.trino.sql.tree.CreateCatalog;
 import io.trino.sql.tree.CreateMaterializedView;
 import io.trino.sql.tree.CreateRole;
 import io.trino.sql.tree.CreateSchema;
@@ -66,6 +68,7 @@ import io.trino.sql.tree.JoinUsing;
 import io.trino.sql.tree.Lateral;
 import io.trino.sql.tree.LikeClause;
 import io.trino.sql.tree.Limit;
+import io.trino.sql.tree.LoadPlugin;
 import io.trino.sql.tree.Merge;
 import io.trino.sql.tree.MergeCase;
 import io.trino.sql.tree.MergeDelete;
@@ -83,6 +86,7 @@ import io.trino.sql.tree.QualifiedName;
 import io.trino.sql.tree.Query;
 import io.trino.sql.tree.QueryPeriod;
 import io.trino.sql.tree.QuerySpecification;
+import io.trino.sql.tree.RefreshCatalog;
 import io.trino.sql.tree.RefreshMaterializedView;
 import io.trino.sql.tree.Relation;
 import io.trino.sql.tree.RenameColumn;
@@ -647,6 +651,53 @@ public final class SqlFormatter
             }
 
             return null;
+        }
+
+        @Override
+        protected Void visitRefreshCatalog(RefreshCatalog node, Integer context)
+        {
+            builder.append("REFRESH PLUGIN ");
+            builder.append(formatName(node.getCatalogName()));
+
+            return null;
+        }
+
+        @Override
+        protected Void visitLoadPlugin(LoadPlugin node, Integer context)
+        {
+            builder.append("LOAD PLUGIN ");
+            builder.append(formatName(node.getPluginName()));
+            builder.append(" LOCATION " + node.getDir());
+
+            return null;
+        }
+
+        @Override
+        protected Void visitCreateCatalog(CreateCatalog node, Integer indent)
+        {
+            builder.append("CREATE CATALOG ");
+            if (node.isNotExists()) {
+                builder.append("IF NOT EXISTS ");
+            }
+            builder.append(formatName(node.getCatalogName()));
+            builder.append(formatCatalogPropertiesMultiLine(node.getProperties()));
+
+            return null;
+        }
+
+        private String formatCatalogPropertiesMultiLine(List<CatalogProperty> properties)
+        {
+            if (properties.isEmpty()) {
+                return "";
+            }
+
+            String propertyList = properties.stream()
+                    .map(element -> INDENT +
+                            formatStringLiteral(element.getName()) + " = " +
+                            formatExpression(element.getValue()))
+                    .collect(joining(",\n"));
+
+            return "\nWITH (\n" + propertyList + "\n)";
         }
 
         @Override

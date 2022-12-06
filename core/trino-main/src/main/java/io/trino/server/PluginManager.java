@@ -138,58 +138,6 @@ public class PluginManager
         typeRegistry.verifyTypes();
     }
 
-    public void loadPluginDynamically(PluginsProvider pluginsProvider)
-    {
-        pluginsProvider.loadPlugins(this::loadPluginDynamically, PluginManager::createClassLoader);
-
-        typeRegistry.verifyTypes();
-    }
-
-    private void loadPluginDynamically(String plugin, Supplier<PluginClassLoader> createClassLoader)
-    {
-        log.info("-- Loading plugin %s --", plugin);
-
-        PluginClassLoader pluginClassLoader = createClassLoader.get();
-
-        log.debug("Classpath for plugin:");
-        for (URL url : pluginClassLoader.getURLs()) {
-            log.debug("    %s", url.getPath());
-        }
-
-        handleResolver.registerClassLoader(pluginClassLoader);
-        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(pluginClassLoader)) {
-            loadPluginDynamically(pluginClassLoader);
-        }
-
-        log.info("-- Finished loading plugin %s --", plugin);
-    }
-
-    private void loadPluginDynamically(PluginClassLoader pluginClassLoader)
-    {
-        ServiceLoader<Plugin> serviceLoader = ServiceLoader.load(Plugin.class, pluginClassLoader);
-        List<Plugin> plugins = ImmutableList.copyOf(serviceLoader);
-        checkState(!plugins.isEmpty(), "No service providers of type %s in the classpath: %s", Plugin.class.getName(), asList(pluginClassLoader.getURLs()));
-
-        for (Plugin plugin : plugins) {
-            log.info("Installing %s", plugin.getClass().getName());
-            installPluginDynamically(plugin, pluginClassLoader::duplicate);
-        }
-    }
-
-    public void installPluginDynamically(Plugin plugin, Function<CatalogHandle, ClassLoader> duplicatePluginClassLoaderFactory)
-    {
-        installPluginInternalDynamically(plugin, duplicatePluginClassLoaderFactory);
-        typeRegistry.verifyTypes();
-    }
-
-    private void installPluginInternalDynamically(Plugin plugin, Function<CatalogHandle, ClassLoader> duplicatePluginClassLoaderFactory)
-    {
-        for (ConnectorFactory connectorFactory : plugin.getConnectorFactories()) {
-            log.info("Registering connector %s", connectorFactory.getName());
-            this.connectorFactory.addConnectorFactory(connectorFactory, duplicatePluginClassLoaderFactory);
-        }
-    }
-
     private void loadPlugin(String plugin, Supplier<PluginClassLoader> createClassLoader)
     {
         log.info("-- Loading plugin %s --", plugin);
@@ -304,6 +252,58 @@ public class PluginManager
         for (ExchangeManagerFactory exchangeManagerFactory : plugin.getExchangeManagerFactories()) {
             log.info("Registering exchange manager %s", exchangeManagerFactory.getName());
             exchangeManagerRegistry.addExchangeManagerFactory(exchangeManagerFactory);
+        }
+    }
+
+    public void loadPluginDynamically(PluginsProvider pluginsProvider)
+    {
+        pluginsProvider.loadPlugins(this::loadPluginDynamically, PluginManager::createClassLoader);
+
+        typeRegistry.verifyTypes();
+    }
+
+    private void loadPluginDynamically(String plugin, Supplier<PluginClassLoader> createClassLoader)
+    {
+        log.info("-- Loading plugin %s --", plugin);
+
+        PluginClassLoader pluginClassLoader = createClassLoader.get();
+
+        log.debug("Classpath for plugin:");
+        for (URL url : pluginClassLoader.getURLs()) {
+            log.debug("    %s", url.getPath());
+        }
+
+        handleResolver.registerClassLoader(pluginClassLoader);
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(pluginClassLoader)) {
+            loadPluginDynamically(pluginClassLoader);
+        }
+
+        log.info("-- Finished loading plugin %s --", plugin);
+    }
+
+    private void loadPluginDynamically(PluginClassLoader pluginClassLoader)
+    {
+        ServiceLoader<Plugin> serviceLoader = ServiceLoader.load(Plugin.class, pluginClassLoader);
+        List<Plugin> plugins = ImmutableList.copyOf(serviceLoader);
+        checkState(!plugins.isEmpty(), "No service providers of type %s in the classpath: %s", Plugin.class.getName(), asList(pluginClassLoader.getURLs()));
+
+        for (Plugin plugin : plugins) {
+            log.info("Installing %s", plugin.getClass().getName());
+            installPluginDynamically(plugin, pluginClassLoader::duplicate);
+        }
+    }
+
+    public void installPluginDynamically(Plugin plugin, Function<CatalogHandle, ClassLoader> duplicatePluginClassLoaderFactory)
+    {
+        installPluginInternalDynamically(plugin, duplicatePluginClassLoaderFactory);
+        typeRegistry.verifyTypes();
+    }
+
+    private void installPluginInternalDynamically(Plugin plugin, Function<CatalogHandle, ClassLoader> duplicatePluginClassLoaderFactory)
+    {
+        for (ConnectorFactory connectorFactory : plugin.getConnectorFactories()) {
+            log.info("Registering connector %s", connectorFactory.getName());
+            this.connectorFactory.addConnectorFactory(connectorFactory, duplicatePluginClassLoaderFactory);
         }
     }
 
