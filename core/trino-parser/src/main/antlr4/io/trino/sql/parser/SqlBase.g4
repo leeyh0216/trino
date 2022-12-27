@@ -173,6 +173,8 @@ statement
         (WHERE where=booleanExpression)?                               #update
     | MERGE INTO qualifiedName (AS? identifier)?
         USING relation ON expression mergeCase+                        #merge
+    | LOAD FUNCTION qualifiedName
+        (LOCATION dir=string)                                          #loadFunction
     ;
 
 query
@@ -857,6 +859,7 @@ nonReserved
     | WINDOW | WITHIN | WITHOUT | WORK | WRAPPER | WRITE
     | YEAR
     | ZONE
+    | LOAD | FUNCTION | LOCATION
     ;
 
 ABSENT: 'ABSENT';
@@ -1132,6 +1135,9 @@ WRAPPER: 'WRAPPER';
 WRITE: 'WRITE';
 YEAR: 'YEAR';
 ZONE: 'ZONE';
+LOAD: 'LOAD';
+FUNCTION: 'FUNCTION';
+LOCATION: 'LOCATION';
 
 EQ: '=';
 NEQ: '<>' | '!=';

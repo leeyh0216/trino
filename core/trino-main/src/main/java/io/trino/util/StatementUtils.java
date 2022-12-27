@@ -35,6 +35,7 @@ import io.trino.execution.DropTableTask;
 import io.trino.execution.DropViewTask;
 import io.trino.execution.GrantRolesTask;
 import io.trino.execution.GrantTask;
+import io.trino.execution.LoadFunctionTask;
 import io.trino.execution.PrepareTask;
 import io.trino.execution.RenameColumnTask;
 import io.trino.execution.RenameMaterializedViewTask;
@@ -85,6 +86,7 @@ import io.trino.sql.tree.ExplainAnalyze;
 import io.trino.sql.tree.Grant;
 import io.trino.sql.tree.GrantRoles;
 import io.trino.sql.tree.Insert;
+import io.trino.sql.tree.LoadFunction;
 import io.trino.sql.tree.Merge;
 import io.trino.sql.tree.Prepare;
 import io.trino.sql.tree.Query;
@@ -224,6 +226,7 @@ public final class StatementUtils
             .add(dataDefinitionStatement(SetViewAuthorization.class, SetViewAuthorizationTask.class))
             .add(dataDefinitionStatement(StartTransaction.class, StartTransactionTask.class))
             .add(dataDefinitionStatement(Use.class, UseTask.class))
+            .add(dataDefinitionStatement(LoadFunction.class, LoadFunctionTask.class))
             .build().stream()
             .collect(toImmutableMap(StatementTypeInfo::getStatementType, identity()));
 

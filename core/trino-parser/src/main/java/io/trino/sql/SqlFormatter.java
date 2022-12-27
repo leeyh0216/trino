@@ -66,6 +66,7 @@ import io.trino.sql.tree.JoinUsing;
 import io.trino.sql.tree.Lateral;
 import io.trino.sql.tree.LikeClause;
 import io.trino.sql.tree.Limit;
+import io.trino.sql.tree.LoadFunction;
 import io.trino.sql.tree.Merge;
 import io.trino.sql.tree.MergeCase;
 import io.trino.sql.tree.MergeDelete;
@@ -2016,6 +2017,16 @@ public final class SqlFormatter
         {
             builder.append("SET TIME ZONE ");
             builder.append(node.getTimeZone().map(SqlFormatter::formatExpression).orElse("LOCAL"));
+            return null;
+        }
+
+        //SK Telecom Section
+        @Override
+        protected Void visitLoadFunction(LoadFunction node, Integer context)
+        {
+            builder.append("LOAD FUNCTION");
+            builder.append(" ").append(node.getPluginName().toString());
+            builder.append("(").append("LOCATION").append("=").append("'").append(node.getPluginDir()).append("'").append(")");
             return null;
         }
 

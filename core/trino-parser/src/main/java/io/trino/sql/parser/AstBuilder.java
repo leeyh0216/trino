@@ -131,6 +131,7 @@ import io.trino.sql.tree.Lateral;
 import io.trino.sql.tree.LikeClause;
 import io.trino.sql.tree.LikePredicate;
 import io.trino.sql.tree.Limit;
+import io.trino.sql.tree.LoadFunction;
 import io.trino.sql.tree.LogicalExpression;
 import io.trino.sql.tree.LongLiteral;
 import io.trino.sql.tree.MeasureDefinition;
@@ -3328,6 +3329,16 @@ class AstBuilder
         QueryPeriod.RangeType type = getRangeType((Token) context.rangeType().getChild(0).getPayload());
         Expression marker = (Expression) visit(context.valueExpression());
         return new QueryPeriod(getLocation(context), type, marker);
+    }
+
+    //SK Telecom Section
+    @Override
+    public Node visitLoadFunction(SqlBaseParser.LoadFunctionContext context)
+    {
+        return new LoadFunction(
+                getLocation(context),
+                getQualifiedName(context.qualifiedName()),
+                ((StringLiteral) visit(context.string())).getValue());
     }
 
     // ***************** helpers *****************
