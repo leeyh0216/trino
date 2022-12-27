@@ -235,7 +235,10 @@ public class GlobalFunctionCatalog
 
         FunctionBundle getFunctionBundle(FunctionId functionId);
 
-        void checkFunctionExists(FunctionMetadata functionMetadata);
+        default void checkFunctionExists(FunctionMetadata functionMetadata)
+        {
+            //Nothing to do
+        }
     }
 
     private abstract static class AbstractFunctionMap
@@ -468,12 +471,6 @@ public class GlobalFunctionCatalog
         protected Multimap<String, FunctionMetadata> getFunctionsByLowerCaseName()
         {
             return functionsByLowerCaseName;
-        }
-
-        @Override
-        public void checkFunctionExists(FunctionMetadata functionMetadata)
-        {
-            //Nothing to do
         }
     }
 
