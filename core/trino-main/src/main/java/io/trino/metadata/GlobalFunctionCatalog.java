@@ -34,12 +34,16 @@ import io.trino.spi.function.WindowFunctionSupplier;
 import io.trino.spi.type.TypeSignature;
 
 import javax.annotation.concurrent.ThreadSafe;
+import javax.inject.Inject;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -57,7 +61,34 @@ public class GlobalFunctionCatalog
         implements FunctionProvider
 {
     public static final String BUILTIN_SCHEMA = "builtin";
-    private volatile FunctionMap functions = new FunctionMap();
+    private final Function<FunctionMapGenArgs, AbstractFunctionMap> functionMapGenFunction;
+    private volatile AbstractFunctionMap functions;
+    private volatile FunctionEvictEventListener functionEvictEventListener = (fid) -> {};
+
+    public GlobalFunctionCatalog()
+    {
+        this(false);
+    }
+
+    @Inject
+    public GlobalFunctionCatalog(FunctionConfig config)
+    {
+        //TODO GlobalFunctionCatalog를 Interface로 만들어야 할까? 그러면 다형성 측면에서는 도움이 되지만, Trino Upstream과 Merge 시 문제가 많이 발생할 수 있다.
+        this(config.getDynamicFunctionLoading());
+    }
+
+    private GlobalFunctionCatalog(boolean dynamicFunctionLoading)
+    {
+        functionMapGenFunction = AbstractFunctionMap.functionMapGenFunction.apply(dynamicFunctionLoading);
+        Supplier<AbstractFunctionMap> functionMapSupplier = AbstractFunctionMap.defaultFunctionMapGenFunction.apply(dynamicFunctionLoading);
+
+        functions = functionMapSupplier.get();
+    }
+
+    public void setFunctionEvictEventListener(FunctionEvictEventListener functionEvictEventListener)
+    {
+        this.functionEvictEventListener = functionEvictEventListener;
+    }
 
     public final synchronized void addFunctions(FunctionBundle functionBundle)
     {
@@ -65,12 +96,12 @@ public class GlobalFunctionCatalog
             checkArgument(!functionMetadata.getSignature().getName().contains("|"), "Function name cannot contain '|' character: %s", functionMetadata.getSignature());
             checkArgument(!functionMetadata.getSignature().getName().contains("@"), "Function name cannot contain '@' character: %s", functionMetadata.getSignature());
             checkNotSpecializedTypeOperator(functionMetadata.getSignature());
-            for (FunctionMetadata existingFunction : this.functions.list()) {
-                checkArgument(!functionMetadata.getFunctionId().equals(existingFunction.getFunctionId()), "Function already registered: %s", functionMetadata.getFunctionId());
-                checkArgument(!functionMetadata.getSignature().equals(existingFunction.getSignature()), "Function already registered: %s", functionMetadata.getSignature());
-            }
+            this.functions.checkFunctionExists(functionMetadata);
         }
-        this.functions = new FunctionMap(this.functions, functionBundle);
+        this.functions = functionMapGenFunction.apply(new FunctionMapGenArgs(this.functions, functionBundle));
+
+        //Function Cache Eviction. Load 이후에는 Invalid Cache 참조가 일어나지 않도록 한다.
+        functionBundle.getFunctions().forEach(f -> functionEvictEventListener.evict(f.getFunctionId()));
     }
 
     /**
@@ -172,42 +203,74 @@ public class GlobalFunctionCatalog
         return functions.getFunctionBundle(functionId).getScalarFunctionImplementation(functionId, boundSignature, functionDependencies, invocationConvention);
     }
 
-    private static class FunctionMap
+    private static class FunctionMapGenArgs
     {
-        private final Map<FunctionId, FunctionBundle> functionBundlesById;
-        private final Map<FunctionId, FunctionMetadata> functionsById;
-        // function names are currently lower cased
-        private final Multimap<String, FunctionMetadata> functionsByLowerCaseName;
+        private final AbstractFunctionMap functionMap;
+        private final FunctionBundle functionBundle;
 
-        public FunctionMap()
+        public FunctionMapGenArgs(AbstractFunctionMap functionMap, FunctionBundle functionBundle)
         {
-            functionBundlesById = ImmutableMap.of();
-            functionsById = ImmutableMap.of();
-            functionsByLowerCaseName = ImmutableListMultimap.of();
+            this.functionMap = functionMap;
+            this.functionBundle = functionBundle;
         }
 
-        public FunctionMap(FunctionMap map, FunctionBundle functionBundle)
+        public AbstractFunctionMap getFunctionMap()
         {
-            this.functionBundlesById = ImmutableMap.<FunctionId, FunctionBundle>builder()
-                    .putAll(map.functionBundlesById)
-                    .putAll(functionBundle.getFunctions().stream()
-                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, functionMetadata -> functionBundle)))
-                    .buildOrThrow();
+            return functionMap;
+        }
 
-            this.functionsById = ImmutableMap.<FunctionId, FunctionMetadata>builder()
-                    .putAll(map.functionsById)
-                    .putAll(functionBundle.getFunctions().stream()
-                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, Function.identity())))
-                    .buildOrThrow();
+        public FunctionBundle getFunctionBundle()
+        {
+            return functionBundle;
+        }
+    }
 
-            ImmutableListMultimap.Builder<String, FunctionMetadata> functionsByName = ImmutableListMultimap.<String, FunctionMetadata>builder()
-                    .putAll(map.functionsByLowerCaseName);
-            functionBundle.getFunctions()
-                    .forEach(functionMetadata -> functionsByName.put(functionMetadata.getSignature().getName().toLowerCase(ENGLISH), functionMetadata));
-            this.functionsByLowerCaseName = functionsByName.build();
+    private interface FunctionMap
+    {
+        List<FunctionMetadata> list();
 
+        Collection<FunctionMetadata> get(String functionName);
+
+        FunctionMetadata get(FunctionId functionId);
+
+        FunctionBundle getFunctionBundle(FunctionId functionId);
+
+        void checkFunctionExists(FunctionMetadata functionMetadata);
+    }
+
+    private abstract static class AbstractFunctionMap
+            implements FunctionMap
+    {
+        public static Function<Boolean, Function<FunctionMapGenArgs, AbstractFunctionMap>> functionMapGenFunction = (dynamicLoading) ->
+        {
+            if (dynamicLoading) {
+                return (genArg) -> new DynamicFunctionMap(genArg.getFunctionMap(), genArg.getFunctionBundle());
+            }
+            else {
+                return (genArg) -> new StaticFunctionMap(genArg.getFunctionMap(), genArg.getFunctionBundle());
+            }
+        };
+
+        public static Function<Boolean, Supplier<AbstractFunctionMap>> defaultFunctionMapGenFunction = (dynamicLoading) ->
+        {
+            if (dynamicLoading) {
+                return DynamicFunctionMap::new;
+            }
+            else {
+                return StaticFunctionMap::new;
+            }
+        };
+
+        protected abstract Map<FunctionId, FunctionBundle> getFunctionBundlesById();
+
+        protected abstract Map<FunctionId, FunctionMetadata> getFunctionsById();
+
+        protected abstract Multimap<String, FunctionMetadata> getFunctionsByLowerCaseName();
+
+        protected void verify()
+        {
             // Make sure all functions with the same name are aggregations or none of them are
-            for (Map.Entry<String, Collection<FunctionMetadata>> entry : this.functionsByLowerCaseName.asMap().entrySet()) {
+            for (Map.Entry<String, Collection<FunctionMetadata>> entry : getFunctionsByLowerCaseName().asMap().entrySet()) {
                 Collection<FunctionMetadata> values = entry.getValue();
                 long aggregations = values.stream()
                         .map(FunctionMetadata::getKind)
@@ -217,28 +280,206 @@ public class GlobalFunctionCatalog
             }
         }
 
+        @Override
         public List<FunctionMetadata> list()
         {
-            return ImmutableList.copyOf(functionsByLowerCaseName.values());
+            return ImmutableList.copyOf(getFunctionsByLowerCaseName().values());
         }
 
+        @Override
         public Collection<FunctionMetadata> get(String functionName)
         {
-            return functionsByLowerCaseName.get(functionName.toLowerCase(ENGLISH));
+            return getFunctionsByLowerCaseName().get(functionName.toLowerCase(ENGLISH));
         }
 
+        @Override
         public FunctionMetadata get(FunctionId functionId)
         {
-            FunctionMetadata functionMetadata = functionsById.get(functionId);
+            FunctionMetadata functionMetadata = getFunctionsById().get(functionId);
             checkArgument(functionMetadata != null, "Unknown function implementation: " + functionId);
             return functionMetadata;
         }
 
+        @Override
         public FunctionBundle getFunctionBundle(FunctionId functionId)
         {
-            FunctionBundle functionBundle = functionBundlesById.get(functionId);
+            FunctionBundle functionBundle = getFunctionBundlesById().get(functionId);
             checkArgument(functionBundle != null, "Unknown function implementation: " + functionId);
             return functionBundle;
         }
+    }
+
+    private static class StaticFunctionMap
+            extends AbstractFunctionMap
+    {
+        private final Map<FunctionId, FunctionBundle> functionBundlesById;
+        private final Map<FunctionId, FunctionMetadata> functionsById;
+        // function names are currently lower cased
+        private final Multimap<String, FunctionMetadata> functionsByLowerCaseName;
+
+        public StaticFunctionMap()
+        {
+            functionBundlesById = ImmutableMap.of();
+            functionsById = ImmutableMap.of();
+            functionsByLowerCaseName = ImmutableListMultimap.of();
+        }
+
+        public StaticFunctionMap(AbstractFunctionMap map, FunctionBundle functionBundle)
+        {
+            this.functionBundlesById = ImmutableMap.<FunctionId, FunctionBundle>builder()
+                    .putAll(map.getFunctionBundlesById())
+                    .putAll(functionBundle.getFunctions().stream()
+                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, functionMetadata -> functionBundle)))
+                    .buildOrThrow();
+            this.functionsById = ImmutableMap.<FunctionId, FunctionMetadata>builder()
+                    .putAll(map.getFunctionsById())
+                    .putAll(functionBundle.getFunctions().stream()
+                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, Function.identity())))
+                    .buildOrThrow();
+
+            ImmutableListMultimap.Builder<String, FunctionMetadata> functionsByName = ImmutableListMultimap.<String, FunctionMetadata>builder()
+                    .putAll(map.getFunctionsByLowerCaseName());
+            functionBundle.getFunctions()
+                    .forEach(functionMetadata -> functionsByName.put(functionMetadata.getSignature().getName().toLowerCase(ENGLISH), functionMetadata));
+            this.functionsByLowerCaseName = functionsByName.build();
+
+            verify();
+        }
+
+        @Override
+        protected Map<FunctionId, FunctionBundle> getFunctionBundlesById()
+        {
+            return functionBundlesById;
+        }
+
+        @Override
+        protected Map<FunctionId, FunctionMetadata> getFunctionsById()
+        {
+            return functionsById;
+        }
+
+        @Override
+        protected Multimap<String, FunctionMetadata> getFunctionsByLowerCaseName()
+        {
+            return functionsByLowerCaseName;
+        }
+
+        @Override
+        public void checkFunctionExists(FunctionMetadata functionMetadata)
+        {
+            for (FunctionMetadata existingFunction : list()) {
+                checkArgument(!functionMetadata.getFunctionId().equals(existingFunction.getFunctionId()), "Function already registered: %s", functionMetadata.getFunctionId());
+                checkArgument(!functionMetadata.getSignature().equals(existingFunction.getSignature()), "Function already registered: %s", functionMetadata.getSignature());
+            }
+        }
+    }
+
+    private static class DynamicFunctionMap
+            extends AbstractFunctionMap
+    {
+        private final Map<FunctionId, FunctionBundle> functionBundlesById;
+        private final Map<FunctionId, FunctionMetadata> functionsById;
+        // function names are currently lower cased
+        private final Multimap<String, FunctionMetadata> functionsByLowerCaseName;
+
+        public DynamicFunctionMap()
+        {
+            functionBundlesById = ImmutableMap.of();
+            functionsById = ImmutableMap.of();
+            functionsByLowerCaseName = ImmutableListMultimap.of();
+        }
+
+        public DynamicFunctionMap(AbstractFunctionMap map, FunctionBundle functionBundle)
+        {
+            this.functionBundlesById = buildFunctionBundlesById(map, functionBundle);
+            this.functionsById = buildFunctionsById(map, functionBundle);
+            this.functionsByLowerCaseName = buildFunctionsByLowerCaseName(map, functionBundle);
+
+            verify();
+        }
+
+        private Map<FunctionId, FunctionBundle> buildFunctionBundlesById(AbstractFunctionMap functionMap, FunctionBundle functionBundle)
+        {
+            Set<FunctionId> functionIdsToAdd = extractFunctionIdsFromFunctionBundle(functionBundle);
+
+            Map<FunctionId, FunctionBundle> originalFunctionBundles = functionMap.getFunctionBundlesById()
+                    .entrySet()
+                    .stream()
+                    .filter(e -> !functionIdsToAdd.contains(e.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            return ImmutableMap.<FunctionId, FunctionBundle>builder()
+                    .putAll(originalFunctionBundles)
+                    .putAll(functionBundle.getFunctions().stream()
+                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, functionMetadata -> functionBundle)))
+                    .buildOrThrow();
+        }
+
+        private Map<FunctionId, FunctionMetadata> buildFunctionsById(AbstractFunctionMap functionMap, FunctionBundle functionBundle)
+        {
+            Set<FunctionId> functionIdsToAdd = extractFunctionIdsFromFunctionBundle(functionBundle);
+
+            Map<FunctionId, FunctionMetadata> originalFunctionsById = functionMap.getFunctionsById()
+                    .entrySet().stream().filter(e -> !functionIdsToAdd.contains(e.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            return ImmutableMap.<FunctionId, FunctionMetadata>builder()
+                    .putAll(originalFunctionsById)
+                    .putAll(functionBundle.getFunctions().stream()
+                            .collect(toImmutableMap(FunctionMetadata::getFunctionId, Function.identity())))
+                    .buildOrThrow();
+        }
+
+        private Multimap<String, FunctionMetadata> buildFunctionsByLowerCaseName(AbstractFunctionMap functionMap, FunctionBundle functionBundle)
+        {
+            Set<FunctionId> functionIdsToAdd = extractFunctionIdsFromFunctionBundle(functionBundle);
+
+            ImmutableListMultimap.Builder<String, FunctionMetadata> functionsByName = ImmutableListMultimap.<String, FunctionMetadata>builder();
+            functionMap.getFunctionsByLowerCaseName()
+                    .entries()
+                    .stream()
+                    .filter(e -> !functionIdsToAdd.contains(e.getValue().getFunctionId())).forEach(e -> functionsByName.put(e.getKey(), e.getValue()));
+            functionBundle.getFunctions()
+                    .forEach(functionMetadata -> functionsByName.put(functionMetadata.getSignature().getName().toLowerCase(ENGLISH), functionMetadata));
+
+            return functionsByName.build();
+        }
+
+        private Set<FunctionId> extractFunctionIdsFromFunctionBundle(FunctionBundle functionBundle)
+        {
+            return functionBundle.getFunctions().stream()
+                    .map(FunctionMetadata::getFunctionId)
+                    .collect(Collectors.toSet());
+        }
+
+        @Override
+        protected Map<FunctionId, FunctionBundle> getFunctionBundlesById()
+        {
+            return functionBundlesById;
+        }
+
+        @Override
+        protected Map<FunctionId, FunctionMetadata> getFunctionsById()
+        {
+            return functionsById;
+        }
+
+        @Override
+        protected Multimap<String, FunctionMetadata> getFunctionsByLowerCaseName()
+        {
+            return functionsByLowerCaseName;
+        }
+
+        @Override
+        public void checkFunctionExists(FunctionMetadata functionMetadata)
+        {
+            //Nothing to do
+        }
+    }
+
+    @FunctionalInterface
+    public interface FunctionEvictEventListener
+    {
+        void evict(FunctionId functionId);
     }
 }

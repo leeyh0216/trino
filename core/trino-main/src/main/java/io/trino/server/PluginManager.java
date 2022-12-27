@@ -66,7 +66,7 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public class PluginManager
 {
-    private static final ImmutableList<String> SPI_PACKAGES = ImmutableList.<String>builder()
+    public static final ImmutableList<String> SPI_PACKAGES = ImmutableList.<String>builder()
             .add("io.trino.spi.")
             .add("com.fasterxml.jackson.annotation.")
             .add("io.airlift.slice.")

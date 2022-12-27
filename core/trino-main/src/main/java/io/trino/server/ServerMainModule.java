@@ -65,6 +65,7 @@ import io.trino.metadata.DisabledSystemSecurityMetadata;
 import io.trino.metadata.DiscoveryNodeManager;
 import io.trino.metadata.ForNodeManager;
 import io.trino.metadata.FunctionBundle;
+import io.trino.metadata.FunctionConfig;
 import io.trino.metadata.FunctionManager;
 import io.trino.metadata.GlobalFunctionCatalog;
 import io.trino.metadata.HandleJsonModule;
@@ -370,6 +371,7 @@ public class ServerMainModule
                 .setDefault()
                 .to(DisabledSystemSecurityMetadata.class)
                 .in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(FunctionConfig.class);
         binder.bind(GlobalFunctionCatalog.class).in(Scopes.SINGLETON);
         binder.bind(TypeOperatorsCache.class).in(Scopes.SINGLETON);
         newExporter(binder).export(TypeOperatorsCache.class).as(factory -> factory.generatedNameOf(TypeOperators.class));
@@ -381,7 +383,10 @@ public class ServerMainModule
         binder.bind(PlannerContext.class).in(Scopes.SINGLETON);
 
         // function
+        binder.bind(DynamicFunctionPluginManager.class).in(Scopes.SINGLETON);
+        jaxrsBinder(binder).bind(DynamicFunctionPluginResource.class);
         binder.bind(FunctionManager.class).in(Scopes.SINGLETON);
+        binder.bind(GlobalFunctionCatalog.FunctionEvictEventListener.class).to(FunctionManager.class).in(Scopes.SINGLETON);
         newSetBinder(binder, FunctionBundle.class);
         binder.bind(RegisterFunctionBundles.class).asEagerSingleton();
 
