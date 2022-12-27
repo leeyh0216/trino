@@ -445,13 +445,13 @@ public class TestGlobalFunctionCatalog
     }
 
     private static final class CountingFunctionEvictEventListener
-        implements GlobalFunctionCatalog.FunctionEvictEventListener
+            implements GlobalFunctionCatalog.FunctionEvictEventListener
     {
-
-        private int count = 0;
+        private int count;
 
         @Override
-        public void evict(FunctionId functionId) {
+        public void evict(FunctionId functionId)
+        {
             count++;
         }
 

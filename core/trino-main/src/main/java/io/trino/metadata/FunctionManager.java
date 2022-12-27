@@ -13,6 +13,7 @@
  */
 package io.trino.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
@@ -335,5 +336,11 @@ public class FunctionManager
         functionCatalog.addFunctions(SystemFunctionBundle.create(new FeaturesConfig(), typeOperators, new BlockTypeOperators(typeOperators), UNKNOWN));
         functionCatalog.addFunctions(new InternalFunctionBundle(new LiteralFunction(new InternalBlockEncodingSerde(new BlockEncodingManager(), TESTING_TYPE_MANAGER))));
         return new FunctionManager(CatalogServiceProvider.fail(), functionCatalog);
+    }
+
+    @VisibleForTesting
+    public Cache<FunctionKey, ScalarFunctionImplementation> getSpecializedScalarCache()
+    {
+        return specializedScalarCache;
     }
 }
