@@ -20,6 +20,7 @@ import io.trino.client.NodeVersion;
 import io.trino.operator.scalar.ChoicesSpecializedSqlScalarFunction;
 import io.trino.operator.scalar.SpecializedSqlScalarFunction;
 import io.trino.spi.function.BoundSignature;
+import io.trino.spi.function.FunctionId;
 import io.trino.spi.function.FunctionMetadata;
 import io.trino.spi.function.OperatorType;
 import io.trino.spi.function.ScalarFunction;
@@ -122,18 +123,25 @@ public class TestGlobalFunctionCatalog
         TypeOperators typeOperators = new TypeOperators();
         FunctionConfig dynamicFunctionConfig = new FunctionConfig();
         dynamicFunctionConfig.setDynamicFunctionLoading(true);
+
+        CountingFunctionEvictEventListener evictEventListener = new CountingFunctionEvictEventListener();
         GlobalFunctionCatalog globalFunctionCatalog = new GlobalFunctionCatalog(dynamicFunctionConfig);
+        globalFunctionCatalog.setFunctionEvictEventListener(evictEventListener);
+
         globalFunctionCatalog.addFunctions(SystemFunctionBundle.create(new FeaturesConfig(), typeOperators, new BlockTypeOperators(typeOperators), NodeVersion.UNKNOWN));
+        int initialEvictCnt = evictEventListener.getCount();
         globalFunctionCatalog.addFunctions(originalFunctionBundle);
         for (FunctionMetadata metadata : modifiedFunctionBundle.getFunctions()) {
             assertNotSame(metadata, globalFunctionCatalog.getFunctionMetadata(metadata.getFunctionId()));
         }
+        assertEquals(1, evictEventListener.getCount() - initialEvictCnt);
         for (FunctionMetadata metadata : originalFunctionBundle.getFunctions()) {
             assertSame(metadata, globalFunctionCatalog.getFunctionMetadata(metadata.getFunctionId()));
         }
 
         //Reload Function
         globalFunctionCatalog.addFunctions(modifiedFunctionBundle);
+        assertEquals(2, evictEventListener.getCount() - initialEvictCnt);
         for (FunctionMetadata metadata : originalFunctionBundle.getFunctions()) {
             assertNotSame(metadata, globalFunctionCatalog.getFunctionMetadata(metadata.getFunctionId()));
         }
@@ -433,6 +441,23 @@ public class TestGlobalFunctionCatalog
         public static long customAdd(@SqlType(StandardTypes.BIGINT) long x, @SqlType(StandardTypes.BIGINT) long y)
         {
             return x + y;
+        }
+    }
+
+    private static final class CountingFunctionEvictEventListener
+        implements GlobalFunctionCatalog.FunctionEvictEventListener
+    {
+
+        private int count = 0;
+
+        @Override
+        public void evict(FunctionId functionId) {
+            count++;
+        }
+
+        public int getCount()
+        {
+            return count;
         }
     }
 }
