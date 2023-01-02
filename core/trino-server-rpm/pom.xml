@@ -17,6 +17,13 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
 
         <server.tar.package>trino-server-${project.version}</server.tar.package>
+
+        <!-- For Versioned RPM -->
+        <rpm.lib.dir>/usr/lib/trino-${project.version}</rpm.lib.dir>
+        <rpm.etc.dir>/etc/trino-${project.version}</rpm.etc.dir>
+        <rpm.init.dir>/etc/init.d/trino-${project.version}-dir</rpm.init.dir>
+        <rpm.var.dir>/var/lib/trino-${project.version}</rpm.var.dir>
+        <rpm.log.dir>/var/log/trino-${project.version}</rpm.log.dir>
     </properties>
 
     <dependencies>
@@ -116,6 +123,7 @@
             <plugin>
                 <groupId>org.codehaus.gmaven</groupId>
                 <artifactId>groovy-maven-plugin</artifactId>
+                <version>2.1.1</version>
                 <executions>
                     <execution>
                         <phase>prepare-package</phase>
@@ -144,7 +152,7 @@
 
                     <packages>
                         <package>
-                            <name>trino-server-rpm</name>
+                            <name>trino-server-rpm-${project.version}</name>
                             <nameOverride>trino-server-rpm-${project.version}.noarch.rpm</nameOverride>
                             <version>${project.version}</version>
                             <release>1</release>
@@ -180,14 +188,14 @@
 
                             <links>
                                 <link>
-                                    <path>/usr/lib/trino/etc</path>
-                                    <target>/etc/trino</target>
+                                    <path>/etc/init.d/trino-${project.version}</path>
+                                    <target>${rpm.init.dir}/trino</target>
                                 </link>
                             </links>
 
                             <rules>
                                 <rule>
-                                    <destination>/usr/lib/trino/bin</destination>
+                                    <destination>${rpm.lib.dir}/bin</destination>
                                     <base>${server.tar.package}/bin</base>
                                     <!-- make sure launcher scripts are executable -->
                                     <fileMode>0755</fileMode>
@@ -197,7 +205,7 @@
                                 </rule>
 
                                 <rule>
-                                    <destination>/usr/lib/trino/bin</destination>
+                                    <destination>${rpm.lib.dir}/bin</destination>
                                     <base>${server.tar.package}/bin</base>
                                     <!-- copy sub folders -->
                                     <includes>
@@ -206,7 +214,7 @@
                                 </rule>
 
                                 <rule>
-                                    <destination>/etc/init.d</destination>
+                                    <destination>${rpm.init.dir}</destination>
                                     <base>dist/etc/init.d</base>
                                     <!-- make sure init.d scripts are executable -->
                                     <fileMode>0755</fileMode>
@@ -216,7 +224,7 @@
                                 </rule>
 
                                 <rule>
-                                    <destination>/usr/lib/trino/shared</destination>
+                                    <destination>${rpm.lib.dir}/shared</destination>
                                     <base>${server.tar.package}/shared</base>
                                     <includes>
                                         <include>*</include>
@@ -226,7 +234,7 @@
                                 <rule>
                                     <!-- This should go to just /usr/lib/trino eventually. But that needs modifying
                                     launcher.py in airlift, to have a configurable option for install_path -->
-                                    <destination>/usr/lib/trino/lib</destination>
+                                    <destination>${rpm.lib.dir}/lib</destination>
                                     <base>${server.tar.package}/lib</base>
                                     <includes>
                                         <include>*</include>
@@ -234,7 +242,7 @@
                                 </rule>
 
                                 <rule>
-                                    <destination>/usr/lib/trino/plugin</destination>
+                                    <destination>${rpm.lib.dir}/plugin</destination>
                                     <base>${server.tar.package}/plugin</base>
                                     <includes>
                                         <include>*/*</include>
@@ -242,7 +250,7 @@
                                 </rule>
 
                                 <rule>
-                                    <destination>/etc/trino</destination>
+                                    <destination>${rpm.etc.dir}</destination>
                                     <base>dist/config</base>
                                     <includes>
                                         <include>*</include>
@@ -263,10 +271,38 @@
 
                                 <!-- Add these rules so that .spec knows these dirs are to be removed too on rpm -e -->
                                 <rule>
-                                    <destination>/usr/lib/trino</destination>
+                                    <destination>${rpm.lib.dir}</destination>
                                 </rule>
                                 <rule>
-                                    <destination>/usr/lib/trino/lib</destination>
+                                    <destination>${rpm.lib.dir}/lib</destination>
+                                </rule>
+
+                                <!-- For Versioned RPM -->
+                                <rule>
+                                    <destination>${rpm.var.dir}</destination>
+                                    <base>dist</base>
+                                    <includes>
+                                        <include>nocontent</include>
+                                    </includes>
+                                </rule>
+                                <rule>
+                                    <destination>${rpm.log.dir}</destination>
+                                    <base>dist</base>
+                                    <includes>
+                                        <include>nocontent</include>
+                                    </includes>
+                                </rule>
+                                <rule>
+                                    <destination>${rpm.lib.dir}/etc</destination>
+                                </rule>
+                                <rule>
+                                    <destination>${rpm.var.dir}/data/etc</destination>
+                                </rule>
+                                <rule>
+                                    <destination>${rpm.var.dir}/data/plugin</destination>
+                                </rule>
+                                <rule>
+                                    <destination>${rpm.var.dir}/data/var</destination>
                                 </rule>
                             </rules>
                         </package>
