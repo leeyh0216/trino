@@ -21,18 +21,23 @@ ACTION_NAME=$1
 SERVICE_NAME='trino'
 SERVICE_USER='trino'
 
+# For Versioned RPM
+CURRENT_VERSION=$(basename "${SCRIPT_NAME}" | awk -F '-' '{print $2}')
+LIB_DIR="/usr/lib/trino-$CURRENT_VERSION"
+ETC_DIR="/etc/trino-$CURRENT_VERSION"
+
 # Launcher Config.
 # Use data-dir from node.properties file (assumes it to be at /etc/trino). For other args use defaults from rpm install
-NODE_PROPERTIES=/etc/trino/node.properties
+NODE_PROPERTIES=$ETC_DIR/node.properties
 DATA_DIR=$(grep -Po "(?<=^node.data-dir=).*" $NODE_PROPERTIES | tail -n 1)
 SERVER_LOG_FILE=$(grep -Po "(?<=^node.server-log-file=).*" $NODE_PROPERTIES | tail -n 1)
 LAUNCHER_LOG_FILE=$(grep -Po "(?<=^node.launcher-log-file=).*" $NODE_PROPERTIES | tail -n 1)
 CONFIGURATION=(
-    --launcher-config /usr/lib/trino/bin/launcher.properties
+    --launcher-config "$LIB_DIR/bin/launcher.properties"
     --data-dir "$DATA_DIR"
     --node-config "$NODE_PROPERTIES"
-    --jvm-config /etc/trino/jvm.config
-    --config /etc/trino/config.properties
+    --jvm-config "$ETC_DIR/jvm.config"
+    --config "$ETC_DIR/config.properties"
     --launcher-log-file "${LAUNCHER_LOG_FILE:-/var/log/trino/launcher.log}"
     --server-log-file "${SERVER_LOG_FILE:-/var/log/trino/server.log}"
 )
@@ -50,7 +55,7 @@ ulimit -n "${files_limit}"
 declare -A CONFIG_ENV
 # Don't need shellcheck to follow env.sh
 # shellcheck disable=1091
-source /etc/trino/env.sh
+source $ETC_DIR/env.sh
 
 sudo_options=(-u "$SERVICE_USER")
 if [ -z "${JAVA_HOME}" ]; then
@@ -66,24 +71,34 @@ done
 
 start() {
     echo "Starting ${SERVICE_NAME} "
-    sudo "${sudo_options[@]}" /usr/lib/trino/bin/launcher start "${CONFIGURATION[@]}"
+    if [ ! \( -L "${LIB_DIR}/etc" \) ];
+    then
+        ln -sf "$ETC_DIR" "$LIB_DIR/etc"
+    fi
+
+    sudo "${sudo_options[@]}" $LIB_DIR/bin/launcher start "${CONFIGURATION[@]}"
     return $?
 }
 
 stop() {
     echo "Stopping ${SERVICE_NAME} "
-    sudo "${sudo_options[@]}" /usr/lib/trino/bin/launcher stop "${CONFIGURATION[@]}"
+    sudo "${sudo_options[@]}" $LIB_DIR/bin/launcher stop "${CONFIGURATION[@]}"
     return $?
 }
 
 status() {
     echo "Getting status for ${SERVICE_NAME} "
-    sudo "${sudo_options[@]}" /usr/lib/trino/bin/launcher status "${CONFIGURATION[@]}"
+    sudo "${sudo_options[@]}" $LIB_DIR/bin/launcher status "${CONFIGURATION[@]}"
     return $?
 }
 
 restart() {
-    sudo "${sudo_options[@]}" /usr/lib/trino/bin/launcher restart "${CONFIGURATION[@]}"
+    if [ ! \( -L "${LIB_DIR}/etc" \) ];
+    then
+        ln -sf "$ETC_DIR" "$LIB_DIR/etc"
+    fi
+
+    sudo "${sudo_options[@]}" $LIB_DIR/bin/launcher restart "${CONFIGURATION[@]}"
     return $?
 }
 
