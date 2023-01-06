@@ -71,6 +71,7 @@ public class PluginManager
             .add("com.fasterxml.jackson.annotation.")
             .add("io.airlift.slice.")
             .add("org.openjdk.jol.")
+            .add("io.trino.sql.gen.lambda.")
             .build();
 
     private static final Logger log = Logger.get(PluginManager.class);
