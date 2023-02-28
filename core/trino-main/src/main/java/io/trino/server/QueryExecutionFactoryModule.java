@@ -39,6 +39,7 @@ import io.trino.execution.DropTableTask;
 import io.trino.execution.DropViewTask;
 import io.trino.execution.GrantRolesTask;
 import io.trino.execution.GrantTask;
+import io.trino.execution.LoadFunctionTask;
 import io.trino.execution.PrepareTask;
 import io.trino.execution.QueryExecution.QueryExecutionFactory;
 import io.trino.execution.RenameColumnTask;
@@ -82,6 +83,7 @@ import io.trino.sql.tree.DropTable;
 import io.trino.sql.tree.DropView;
 import io.trino.sql.tree.Grant;
 import io.trino.sql.tree.GrantRoles;
+import io.trino.sql.tree.LoadFunction;
 import io.trino.sql.tree.Prepare;
 import io.trino.sql.tree.RenameColumn;
 import io.trino.sql.tree.RenameMaterializedView;
@@ -167,6 +169,7 @@ public class QueryExecutionFactoryModule
         bindDataDefinitionTask(binder, executionBinder, SetViewAuthorization.class, SetViewAuthorizationTask.class);
         bindDataDefinitionTask(binder, executionBinder, StartTransaction.class, StartTransactionTask.class);
         bindDataDefinitionTask(binder, executionBinder, Use.class, UseTask.class);
+        bindDataDefinitionTask(binder, executionBinder, LoadFunction.class, LoadFunctionTask.class);
     }
 
     private static <T extends Statement> void bindDataDefinitionTask(

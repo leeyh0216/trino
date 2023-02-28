@@ -13,10 +13,12 @@
  */
 package io.trino.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.trino.FeaturesConfig;
-import io.trino.collect.cache.NonEvictableCache;
 import io.trino.connector.CatalogServiceProvider;
 import io.trino.connector.system.GlobalSystemConnector;
 import io.trino.spi.TrinoException;
@@ -42,6 +44,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -49,7 +52,6 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.primitives.Primitives.wrap;
 import static io.trino.client.NodeVersion.UNKNOWN;
 import static io.trino.collect.cache.CacheUtils.uncheckedCacheGet;
-import static io.trino.collect.cache.SafeCaches.buildNonEvictableCache;
 import static io.trino.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
 import static io.trino.type.InternalTypeManager.TESTING_TYPE_MANAGER;
 import static java.lang.String.format;
@@ -57,10 +59,11 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.HOURS;
 
 public class FunctionManager
+        implements GlobalFunctionCatalog.FunctionEvictEventListener
 {
-    private final NonEvictableCache<FunctionKey, ScalarFunctionImplementation> specializedScalarCache;
-    private final NonEvictableCache<FunctionKey, AggregationImplementation> specializedAggregationCache;
-    private final NonEvictableCache<FunctionKey, WindowFunctionSupplier> specializedWindowCache;
+    private final Cache<FunctionKey, ScalarFunctionImplementation> specializedScalarCache;
+    private final Cache<FunctionKey, AggregationImplementation> specializedAggregationCache;
+    private final Cache<FunctionKey, WindowFunctionSupplier> specializedWindowCache;
 
     private final CatalogServiceProvider<FunctionProvider> functionProviders;
     private final GlobalFunctionCatalog globalFunctionCatalog;
@@ -68,20 +71,35 @@ public class FunctionManager
     @Inject
     public FunctionManager(CatalogServiceProvider<FunctionProvider> functionProviders, GlobalFunctionCatalog globalFunctionCatalog)
     {
-        specializedScalarCache = buildNonEvictableCache(CacheBuilder.newBuilder()
+        specializedScalarCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(1, HOURS));
+                .expireAfterWrite(1, HOURS).build();
 
-        specializedAggregationCache = buildNonEvictableCache(CacheBuilder.newBuilder()
+        specializedAggregationCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(1, HOURS));
+                .expireAfterWrite(1, HOURS).build();
 
-        specializedWindowCache = buildNonEvictableCache(CacheBuilder.newBuilder()
+        specializedWindowCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(1, HOURS));
+                .expireAfterWrite(1, HOURS).build();
 
         this.functionProviders = requireNonNull(functionProviders, "functionProviders is null");
         this.globalFunctionCatalog = requireNonNull(globalFunctionCatalog, "globalFunctionCatalog is null");
+        this.globalFunctionCatalog.setFunctionEvictEventListener(this);
+    }
+
+    @Override
+    public void evict(FunctionId functionId)
+    {
+        evictFromCache(specializedScalarCache, functionId);
+        evictFromCache(specializedAggregationCache, functionId);
+        evictFromCache(specializedWindowCache, functionId);
+    }
+
+    private void evictFromCache(Cache<FunctionKey, ?> cache, FunctionId functionId)
+    {
+        Set<FunctionKey> cacheKeys = ImmutableSet.copyOf(cache.asMap().keySet());
+        cache.invalidateAll(cacheKeys.stream().filter(k -> k.functionId.equals(functionId)).toList());
     }
 
     public ScalarFunctionImplementation getScalarFunctionImplementation(ResolvedFunction resolvedFunction, InvocationConvention invocationConvention)
@@ -318,5 +336,11 @@ public class FunctionManager
         functionCatalog.addFunctions(SystemFunctionBundle.create(new FeaturesConfig(), typeOperators, new BlockTypeOperators(typeOperators), UNKNOWN));
         functionCatalog.addFunctions(new InternalFunctionBundle(new LiteralFunction(new InternalBlockEncodingSerde(new BlockEncodingManager(), TESTING_TYPE_MANAGER))));
         return new FunctionManager(CatalogServiceProvider.fail(), functionCatalog);
+    }
+
+    @VisibleForTesting
+    public Cache<FunctionKey, ScalarFunctionImplementation> getSpecializedScalarCache()
+    {
+        return specializedScalarCache;
     }
 }
